@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Extractor de planillas</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- OCR y Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <h1>Extractor de planillas</h1>
+    <p class="muted">Sube fotos de planillas y descarga un Excel con los datos.</p>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Subir archivos</h2>
+      <div class="row">
+        <div class="col">
+          <label class="label">Selecciona imágenes (JPG/PNG)</label>
+          <input id="fileInput" class="input" type="file" accept="image/*" multiple />
+        </div>
+        <div class="col">
+          <label class="label">Opciones</label>
+          <div class="controls">
+            <label><input type="checkbox" id="showText"> Ver texto OCR</label>
+            <label><input type="checkbox" id="strictMode"> Modo estricto (regex más exigentes)</label>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="button" id="btnProcesar">Procesar</button>
+        <button class="button secondary" id="btnLimpiar">Limpiar</button>
+        <button class="button success" id="btnDescargar" disabled>Descargar Excel</button>
+      </div>
+      <div id="progress" class="progress"></div>
+    </section>
+
+    <section class="card">
+      <h2>Resultados extraídos</h2>
+      <div id="tableWrap" class="table-wrap"></div>
+      <details>
+        <summary>Texto OCR</summary>
+        <pre id="ocrOutput" class="pre"></pre>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Columnas del Excel</h2>
+      <ul class="list">
+        <li><strong>Hoja de ruta:</strong> HOA/HOJA DE RUTA (H)</li>
+        <li><strong>Contrato:</strong> Ctto</li>
+        <li><strong>Solicitante:</strong> Nombre de quien solicita</li>
+        <li><strong>Teléfono:</strong> Número</li>
+        <li><strong>Destinatario:</strong> A quién va dirigido</li>
+        <li><strong>Tipo de servicio:</strong> Servicio</li>
+        <li><strong>Fecha de solicitud:</strong> Fecha inicial</li>
+        
+        <li><strong>Fecha de entrega:</strong> Fecha de entrega</li>
+        <li><strong>Tipo de anillo:</strong> Ej. 2DO ANILLO</li>
+        <li><strong>Hora:</strong> Hora</li>
+        <li><strong>Sala:</strong> Ej. MANANTIAL</li>
+        <li><strong>Coordinador:</strong> Nombre</li>
+        <li><strong>Tamaño:</strong> Ej. 30X42</li>
+        <li><strong>Modelo de marco:</strong> Número</li>
+        <li><strong>Modelo de fondo:</strong> Texto</li>
+        <li><strong>Repuesto:</strong> Observación (ej. NITIDEZ)</li>
+        <li><strong>Precio Bs.:</strong> Monto</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>Hecho por Christopher ✨ — Funciona 100% en navegador</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
