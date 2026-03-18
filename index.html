@@ -7,8 +7,13 @@
     <style>
         /* Diseño optimizado para celulares */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f0f2f5; overflow-y: hidden; }
-        header { background: #1e40af; color: white; text-align: center; padding: 20px; font-size: 24px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         
+        /* Header actualizado con Flexbox para el botón */
+        header { background: #1e40af; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header-title { font-size: 22px; font-weight: bold; }
+        .btn-history { background: #3b82f6; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-history:active { background: #2563eb; transform: scale(0.95); }
+
         /* Carrusel deslizable */
         .carousel { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; height: calc(100vh - 70px); scroll-behavior: smooth; }
         .carousel::-webkit-scrollbar { display: none; }
@@ -33,27 +38,57 @@
         button:active { transform: scale(0.95); background: #047857; }
         button:disabled { background: #94a3b8; transform: none; box-shadow: none; }
         
-        /* Mensaje de guardado */
+        /* Mensajes Toast */
         .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 15px 25px; border-radius: 30px; font-size: 18px; font-weight: bold; display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.2); z-index: 1000; white-space: nowrap; }
+        .toast-error { background: #e74c3c; }
+
+        /* Modal del Historial Diario */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: flex-end; }
+        .modal-content { background: white; width: 100%; max-height: 85vh; border-radius: 20px 20px 0 0; padding: 20px; box-sizing: border-box; overflow-y: auto; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 15px; }
+        .modal-header h2 { margin: 0; font-size: 22px; color: #1e293b; }
+        .close-modal { background: #ef4444; color: white; border: none; width: 35px; height: 35px; border-radius: 50%; font-size: 18px; font-weight: bold; cursor: pointer; }
         
-        /* Mensaje si no hay marcos en un tamaño */
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #3b82f6; }
+        .history-info p { margin: 0; }
+        .history-name { font-weight: bold; color: #0f172a; font-size: 16px; margin-bottom: 5px !important;}
+        .history-qty { color: #059669; font-weight: 900; font-size: 18px; }
+        .history-time { font-size: 12px; color: #64748b; }
+        .delete-btn { background: none; border: none; color: #ef4444; font-size: 24px; padding: 10px; cursor: pointer; height: auto; box-shadow: none;}
+        .delete-btn:active { transform: scale(0.8); background: none; }
+        .empty-history { text-align: center; color: #94a3b8; font-style: italic; padding: 20px 0; }
         .empty-msg { text-align: center; color: #94a3b8; font-size: 18px; padding: 30px 0; font-style: italic; }
     </style>
 </head>
 <body>
 
-    <header>🛠️ Taller Producción</header>
+    <header>
+        <div class="header-title">🛠️ Taller</div>
+        <button class="btn-history" onclick="window.toggleHistorial()">📋 Registros del Día</button>
+    </header>
     
     <div class="carousel" id="carousel">
         </div>
 
+    <div class="modal-overlay" id="modal-historial">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Registros de Hoy</h2>
+                <button class="close-modal" onclick="window.toggleHistorial()">X</button>
+            </div>
+            <div id="lista-historial">
+                </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast">✅ ¡Producción registrada!</div>
+    <div class="toast toast-error" id="toast-deleted">🗑️ Registro anulado</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getFirestore, collection, doc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-        // 1. TUS CREDENCIALES EXACTAS
         const firebaseConfig = {
             apiKey: "AIzaSyA1_lJBb8Jkx3X3rJLpATIeaFhZ7CG6-RA",
             authDomain: "inventario-441b2.firebaseapp.com",
@@ -67,31 +102,30 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        window.db = db; // Guardar db globalmente para poder usarlo en botones de eliminar
+        window.increment = increment; 
+        window.updateDoc = updateDoc;
+        window.doc = doc;
 
-        // TU ENLACE DEL EXCEL
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3FrDSQTwY0ksQhZsVDoeZPwguHeSIapQfm-0MfJn9pw86SFF8IwzyC1HjUvu0dQAxZg/exec";
 
-        // TAMAÑOS ESTÁNDAR
         const SIZES = ['16x22', '20x27', '30x42', '50x40', '50x60', '60x80', 'Otros'];
         const carousel = document.getElementById('carousel');
-
-        // 2. CREAR LAS PANTALLAS (TARJETAS) VACÍAS PARA CADA TAMAÑO
         const sizeContainers = {};
+
+        // 1. DIBUJAR PANTALLAS
         SIZES.forEach(size => {
             const card = document.createElement('div');
             card.className = 'card-size';
-            // Ajuste visual para que se vea el * en lugar de la x en el título
             const titleSize = size.replace('x', '*');
             card.innerHTML = `<div class="size-title">Tamaño ${titleSize}</div><div id="container-${size}"></div>`;
             carousel.appendChild(card);
             sizeContainers[size] = document.getElementById(`container-${size}`);
         });
 
-        // 3. LEER PRODUCTOS EN TIEMPO REAL DESDE TU SISTEMA PRINCIPAL
+        // 2. LEER PRODUCTOS EN TIEMPO REAL
         onSnapshot(collection(db, "productos"), (snapshot) => {
-            // Limpiar contenedores
             SIZES.forEach(size => sizeContainers[size].innerHTML = '');
-            
             let conteos = { '16x22':0, '20x27':0, '30x42':0, '50x40':0, '50x60':0, '60x80':0, 'Otros':0 };
 
             snapshot.docs.forEach(d => {
@@ -100,24 +134,17 @@
                 const name = data.name || "Sin Nombre";
                 const qty = data.quantity || 0;
 
-                // Averiguar a qué tamaño pertenece mirando el nombre
                 let targetSize = 'Otros';
-                let nameLower = name.toLowerCase().replace('*', 'x').replace(' ', ''); // Normalizar texto
+                let nameLower = name.toLowerCase().replace('*', 'x').replace(' ', '');
                 
                 for (let s of ['16x22', '20x27', '30x42', '50x40', '50x60', '60x80']) {
-                    if (nameLower.includes(s)) {
-                        targetSize = s;
-                        break;
-                    }
+                    if (nameLower.includes(s)) { targetSize = s; break; }
                 }
 
                 conteos[targetSize]++;
-
-                // Limpiar el nombre para que no repita el tamaño en la pantalla del celular
                 let cleanName = name.replace(new RegExp(`[- ]*${targetSize.replace('x', '\\*?')}?`, 'gi'), '').trim();
-                if(cleanName === "") cleanName = name; // Por si el nombre era solo la medida
+                if(cleanName === "") cleanName = name; 
 
-                // Crear la fila del producto
                 const itemHTML = `
                 <div class="item-row">
                     <div class="item-header">
@@ -134,11 +161,9 @@
                         </button>
                     </div>
                 </div>`;
-                
                 sizeContainers[targetSize].insertAdjacentHTML('beforeend', itemHTML);
             });
 
-            // Poner mensaje si alguna categoría está vacía
             SIZES.forEach(size => {
                 if (conteos[size] === 0) {
                     sizeContainers[size].innerHTML = `<div class="empty-msg">No hay marcos creados para esta medida.</div>`;
@@ -146,7 +171,7 @@
             });
         });
 
-        // 4. FUNCIÓN PARA GUARDAR LA PRODUCCIÓN
+        // 3. FUNCIÓN PARA GUARDAR PRODUCCIÓN
         window.registrarProduccion = async function(idProducto, nombreCompleto, tamaño) {
             const inputField = document.getElementById(`input-${idProducto}`);
             const btn = document.getElementById(`btn-${idProducto}`);
@@ -161,13 +186,11 @@
             btn.innerText = "⏳...";
 
             try {
-                // A. Aumentar el stock real en tu base de datos (Inventario Pro V33)
+                // A. Actualizar Firebase
                 const docRef = doc(db, "productos", idProducto);
-                await updateDoc(docRef, {
-                    quantity: increment(cantidadAgregar)
-                });
+                await updateDoc(docRef, { quantity: increment(cantidadAgregar) });
 
-                // B. Enviar al Excel silenciosamente
+                // B. Enviar al Excel
                 fetch(SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
@@ -177,11 +200,13 @@
                         modelo: nombreCompleto,
                         cantidadProducida: cantidadAgregar
                     })
-                }).catch(e => console.log("Aviso Excel:", e));
+                });
 
-                // Limpiar pantalla y mostrar éxito
+                // C. Guardar en historial local
+                guardarHistorial(idProducto, nombreCompleto, tamaño, cantidadAgregar);
+
                 inputField.value = '';
-                mostrarToast();
+                mostrarToast('toast');
 
             } catch (error) {
                 console.error(error);
@@ -192,8 +217,110 @@
             }
         };
 
-        function mostrarToast() {
-            const toast = document.getElementById('toast');
+        // --- LÓGICA DEL HISTORIAL Y ANULACIÓN ---
+
+        function guardarHistorial(idProducto, nombreCompleto, tamaño, cantidad) {
+            let historial = JSON.parse(localStorage.getItem('historial_taller')) || [];
+            
+            // Crear un registro único
+            const nuevoRegistro = {
+                idRegistro: Date.now().toString(),
+                idProducto: idProducto,
+                nombreCompleto: nombreCompleto,
+                tamaño: tamaño,
+                cantidad: cantidad,
+                fecha: new Date().toLocaleDateString("es-BO"),
+                hora: new Date().toLocaleTimeString("es-BO", {hour: '2-digit', minute:'2-digit'})
+            };
+
+            historial.push(nuevoRegistro);
+            localStorage.setItem('historial_taller', JSON.stringify(historial));
+        }
+
+        window.toggleHistorial = function() {
+            const modal = document.getElementById('modal-historial');
+            if (modal.style.display === 'flex') {
+                modal.style.display = 'none';
+            } else {
+                dibujarHistorial();
+                modal.style.display = 'flex';
+            }
+        }
+
+        function dibujarHistorial() {
+            const contenedor = document.getElementById('lista-historial');
+            let historial = JSON.parse(localStorage.getItem('historial_taller')) || [];
+            
+            // Filtrar SOLO los de hoy en Bolivia
+            const hoy = new Date().toLocaleDateString("es-BO");
+            historial = historial.filter(item => item.fecha === hoy);
+
+            if (historial.length === 0) {
+                contenedor.innerHTML = '<div class="empty-history">No has registrado nada el día de hoy.</div>';
+                return;
+            }
+
+            // Invertir para mostrar el más reciente arriba
+            historial.reverse();
+
+            contenedor.innerHTML = '';
+            historial.forEach(item => {
+                contenedor.innerHTML += `
+                    <div class="history-item" id="reg-${item.idRegistro}">
+                        <div class="history-info">
+                            <p class="history-name">${item.nombreCompleto}</p>
+                            <p><span class="history-qty">+${item.cantidad}</span> añadidos <span class="history-time">a las ${item.hora}</span></p>
+                        </div>
+                        <button class="delete-btn" onclick="window.anularRegistro('${item.idRegistro}')">✖</button>
+                    </div>
+                `;
+            });
+        }
+
+        window.anularRegistro = async function(idRegistro) {
+            let historial = JSON.parse(localStorage.getItem('historial_taller')) || [];
+            const registroIndex = historial.findIndex(r => r.idRegistro === idRegistro);
+            
+            if (registroIndex === -1) return;
+            const registro = historial[registroIndex];
+
+            const confirmar = confirm(`¿Estás seguro de anular la suma de ${registro.cantidad} marcos de ${registro.nombreCompleto}?`);
+            if (!confirmar) return;
+
+            try {
+                // 1. Restar de Firebase
+                const docRef = window.doc(window.db, "productos", registro.idProducto);
+                await window.updateDoc(docRef, { quantity: window.increment(-registro.cantidad) });
+
+                // 2. Restar del Excel mandando la cantidad en negativo
+                fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tamaño: registro.tamaño.replace('x', '*'),
+                        modelo: registro.nombreCompleto,
+                        cantidadProducida: -registro.cantidad // Se manda negativo para que el Script lo reste
+                    })
+                });
+
+                // 3. Quitar de la memoria local y actualizar pantalla
+                historial.splice(registroIndex, 1);
+                localStorage.setItem('historial_taller', JSON.stringify(historial));
+                dibujarHistorial();
+                mostrarToast('toast-deleted');
+
+                // Cerrar modal si ya no quedan registros
+                if(historial.length === 0) window.toggleHistorial();
+
+            } catch(e) {
+                alert("Error al anular. Revisa tu conexión.");
+                console.error(e);
+            }
+        };
+
+        function mostrarToast(toastId) {
+            const toast = document.getElementById(toastId);
             toast.style.display = 'block';
             setTimeout(() => { toast.style.display = 'none'; }, 2000);
         }
